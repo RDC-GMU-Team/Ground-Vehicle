@@ -1,0 +1,11 @@
+<launch>
+
+  <!-- Launch rosserial_python node -->
+  <node pkg="rosserial_python" type="serial_node.py" name="serial_node" output="screen">
+    <param name="port" type="string" value="/dev/ttyACM0" />
+  </node>
+
+  <!-- Launch joy node -->
+  <node pkg="joy" type="joy_node" name="joy_node" output="screen" />
+
+</launch>
