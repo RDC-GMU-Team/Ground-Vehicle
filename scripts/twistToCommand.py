@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
         #accessing joystick (in the future will be motion planner) and publishing to arduino
         pub = rospy.Publisher("/cmd_vel1", Float32MultiArray, queue_size=10)
-        sub = rospy.Subscriber("//cmd_vel", Twist, twist_callback)
+        sub = rospy.Subscriber("/cmd_vel", Twist, twist_callback)
 
         rospy.init_node('ros__test')
         rospy.loginfo("ros_test is started")
