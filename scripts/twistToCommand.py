@@ -65,7 +65,7 @@ class twistControl(object):
 
         #Control Command to Arduino (format dataindex: fuction)
         #[0:steering 1:throttle 2:arm-Disarm 3:gear 4:frontDiffLock 5:RearDiffLock 6:cameraServo]
-        self.control_cmd = Float32MultiArray( data=[ 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.28 ] )  
+        self.control_cmd = Float32MultiArray( data=[ 0.0, 0.0, 0.0, 0, 0, 0.0, 0 ] )  
         
         #Camera Pose variables
         self.roll = 0.0
