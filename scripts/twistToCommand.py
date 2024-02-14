@@ -68,11 +68,11 @@ class twistControl(object):
         self.control_cmd = Float32MultiArray( data=[ 0.0, 0.0, 0.0, 0, 0, 0.0, 0 ] )  
         
         #Camera Pose variables
-        self.roll = 0.0
-        self.pitch = 0.0
-        self.yaw = 0.0
-        self.set_pitch = 0.0
-        self.def_pitch = 0.0
+        # self.roll = 0.0
+        # self.pitch = 0.0
+        # self.yaw = 0.0
+        # self.set_pitch = 0.0
+        # self.def_pitch = 0.0
         
         #camera stabilization PID values
         self.p = 0.0
@@ -85,7 +85,7 @@ class twistControl(object):
         print("cmd_control")
 
         rospy.Subscriber("/cmd_vel", Twist, self.navStackCB, queue_size=1)
-        rospy.Subscriber("/campose", Float32MultiArray, self.camCB, queue_size=1)
+        # rospy.Subscriber("/campose", Float32MultiArray, self.camCB, queue_size=1)
         rospy.Subscriber("/joy", Joy, self.joyControlCB, queue_size=1)
         self.vel_pub1 = rospy.Publisher("/cmd_vel1", Float32MultiArray, queue_size=1)
         rospy.init_node("cmd_control", anonymous=True)
@@ -112,42 +112,42 @@ class twistControl(object):
         valueScaled = float(value - leftMin) / float(leftSpan)
         return rightMin + (valueScaled * rightSpan)
 
-    def camCB(self, cam):
-        try:
-            self.roll = cam.data[0]
-            self.pitch = cam.data[1]
-            self.yaw = cam.data[2]
-            self.p = cam.data[3]
-            self.i = cam.data[4]
-            self.d = cam.data[5]
-            k = cam.data[6]
+    # def camCB(self, cam):
+    #     try:
+    #         self.roll = cam.data[0]
+    #         self.pitch = cam.data[1]
+    #         self.yaw = cam.data[2]
+    #         self.p = cam.data[3]
+    #         self.i = cam.data[4]
+    #         self.d = cam.data[5]
+    #         k = cam.data[6]
 
-            ang_error = self.set_pitch - self.pitch
-            if(abs(ang_error) < 0.2):
-                ang_error = 0
+    #         ang_error = self.set_pitch - self.pitch
+    #         if(abs(ang_error) < 0.2):
+    #             ang_error = 0
 
-            self.ang_integral_error += ang_error
-            self.ang_integral_error = min(100, max(-15, self.ang_integral_error ))
-            ang_derivative_error = self.prv_ae - ang_error
+    #         self.ang_integral_error += ang_error
+    #         self.ang_integral_error = min(100, max(-15, self.ang_integral_error ))
+    #         ang_derivative_error = self.prv_ae - ang_error
 
-            self.prv_ae = ang_error
+    #         self.prv_ae = ang_error
 
-            self.out_ang = self.out_ang + (self.p * ang_error ) + (self.i * (self.ang_integral_error)) - (self.d * ang_derivative_error)
-            self.out_ang = min(28, max(-5, self.out_ang ))
+    #         self.out_ang = self.out_ang + (self.p * ang_error ) + (self.i * (self.ang_integral_error)) - (self.d * ang_derivative_error)
+    #         self.out_ang = min(28, max(-5, self.out_ang ))
 
-            out = self.translate(self.out_ang, -5, 28, 0, 1)
-            print(out)
-            #ae_inc = self.translate(ae_inc, -74, 74, 0, 1)
-            self.control_cmd.data[6] = out
+    #         out = self.translate(self.out_ang, -5, 28, 0, 1)
+    #         print(out)
+    #         #ae_inc = self.translate(ae_inc, -74, 74, 0, 1)
+    #         self.control_cmd.data[6] = out
 
-            if self.control_cmd.data[6] > 1.0:
-                self.control_cmd.data[6]= 1.0
-                #pass
-            if self.control_cmd.data[6] < 0.0:
-                self.control_cmd.data[6] = 0.0
-                #pass
-        except (Exception, b):
-            print(b)
+    #         if self.control_cmd.data[6] > 1.0:
+    #             self.control_cmd.data[6]= 1.0
+    #             #pass
+    #         if self.control_cmd.data[6] < 0.0:
+    #             self.control_cmd.data[6] = 0.0
+    #             #pass
+    #     except (Exception, b):
+    #         print(b)
 
     def joyControlCB(self, joy):
         try:
@@ -166,7 +166,7 @@ class twistControl(object):
                     self.throttleInitialized = False
                     self.armed = False
                     self.automode = False 
-                    self.control_cmd.data = [ 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.28 ]
+                    self.control_cmd.data = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
                     print("Vehicle Disarmed")
 
             #Joy control loop
@@ -193,22 +193,22 @@ class twistControl(object):
                         self.throttle = -((1 - self.joystick.axes[5])/2)*((1 - self.joystick.axes[5])/2)
                         self.control_cmd.data[1] = self.throttle  
                 
-
+                
                 #Gear Hi-Low
-                if self.joystick.buttons[4] == 1:
-                    self.gear = 1.0
-                if self.joystick.buttons[5] == 1:
-                    self.gear = 0.0
+                # if self.joystick.buttons[4] == 1:
+                #     self.gear = 1.0
+                # if self.joystick.buttons[5] == 1:
+                #     self.gear = 0.0
                 
                 #Front and Rear Diff Lock
-                if self.joystick.buttons[0] == 1:
-                    self.fTLock = 1.0
-                if self.joystick.buttons[3] == 1:
-                    self.fTLock = 0.0
-                if self.joystick.buttons[2] == 1:
-                    self.rTLock = 1.0
-                if self.joystick.buttons[1] == 1:
-                    self.rTLock = 0.0
+                # if self.joystick.buttons[0] == 1:
+                #     self.fTLock = 1.0
+                # if self.joystick.buttons[3] == 1:
+                #     self.fTLock = 0.0
+                # if self.joystick.buttons[2] == 1:
+                #     self.rTLock = 1.0
+                # if self.joystick.buttons[1] == 1:
+                #     self.rTLock = 0.0
 
                 #Mode Control and Deadman switch
                 if self.joystick.buttons[11] == 1 and (self.joystick.axes[5] == 1.0 or self.automode):
@@ -234,10 +234,10 @@ class twistControl(object):
                     self.armed = False
 
                 #Camera angle control
-                self.camangle = self.camangle + self.joystick.axes[7]
-                if self.joystick.buttons[10] == 1:
-                    self.camangle = self.def_pitch
-                    print("Camera angle: " + str(self.camangle) )
+                # self.camangle = self.camangle + self.joystick.axes[7]
+                # if self.joystick.buttons[10] == 1:
+                #     self.camangle = self.def_pitch
+                #     print("Camera angle: " + str(self.camangle) )
                     
                 
                 self.control_cmd.data[3] = self.gear
@@ -287,7 +287,7 @@ class twistControl(object):
          
         else:
             #if disArmed then pass default values
-            self.control_cmd.data = [ -1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.28]
+            self.control_cmd.data = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
             self.automode = False
             self.armed = False
 
