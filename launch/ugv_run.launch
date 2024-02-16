@@ -1,6 +1,6 @@
 <launch>
 
-  <node pkg ="UGV" type ="rostest.py" name ="controller">
+  <node pkg ="ugv" type ="twistToCommand.py" name ="controller">
     <param name="scheduler" value="fifo"/>
     <param name="priority" value="98"/>  
   </node>
@@ -12,5 +12,9 @@
 
   <!-- Launch joy node -->
   <node pkg="joy" type="joy_node" name="joy_node"/>
+  	<param name="port" type="string" value="/dev/input/js0" />
+  </node>
   
+  <!-- Launch gps -->
+  <include file="$(find ublox_gps)/launch/rover.launch" />
 </launch>
