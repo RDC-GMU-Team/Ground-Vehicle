@@ -287,9 +287,11 @@ class twistControl(object):
          
         else:
             #if disArmed then pass default values
-            self.control_cmd.data = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+            self.control_cmd.data = [ 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
             self.automode = False
             self.armed = False
+            self.vel_pub1.publish(self.control_cmd)
+         
 
 
 if __name__ == "__main__":

@@ -5,37 +5,30 @@ from ublox_msgs.msg import NavPVT
 from geometry_msgs.msg import TwistWithCovarianceStamped, TwistStamped, Twist
 import utils
 from utilities import utils as uts
-from sensor_msgs.msg import Imu as IMU
+
 import math
 import message_filters
 import threading
 import time
 import numpy as np
-from calling_model import ModelClass
-from find_current_patch import FindCurrentPatch as image_processor
+
 
 class HeadingCalculator:
     def __init__(self):
         #initialize the variables
-
-        #self.waypoints = utils.read_csv("front_waypoint.csv")
-        self.waypoints = utils.read_csv("cont_waypoints_last_saved.csv")
+        self.waypoints = utils.read_csv("waypoints.csv")
         self.navigation_started = False
         print(f"waypoints:{self.waypoints}")
         self.org_len = len(self.waypoints)
-        
         self.pvt_sub = rospy.Subscriber('/f9p_rover/navpvt', NavPVT, self.pvt_callback)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
-        self.cmd_vel_stamped_pub = rospy.Publisher('/stamped_cmd_vel', TwistStamped, queue_size=1)
-        self.imu_sub = rospy.Subscriber('/imu', IMU, self.imu_callback, queue_size=100)
-        # self.hunter_sub = rospy.Subscriber('/hunter_status', HunterStatus, self.hunter_callback, queue_size=1)
         self.uts = uts()
 
         self.twist = Twist()
         self.twist_stamped = TwistStamped()
         self.cache_pvt_msg = utils.CacheHeaderlessROSMessage(5)
         self.cache_imu_msg = utils.CacheHeaderlessROSMessage(5)
-        
+
         self.rate = rospy.Rate(30)
         self.radius_at_equator = 6371 #km
         self.current_pos = []
@@ -51,13 +44,16 @@ class HeadingCalculator:
         #read from csv and store it in a self.waypoints 
 
     def pid(self):
+        #print("In PID LOOP")
+        if not self.navigation_started:
+            return
         immediate_goal = self.waypoints[0]
         if HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal) > self.goal_tolerance:
             distance_between_two_points = HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal)
             if distance_between_two_points < 3.0:
-                speed = 1.5
+                speed = 0.15
             else:
-                speed = 4.8
+                speed = 1.0
 
             error = self.find_next_heading_to_waypoint(self.current_pos, self.current_heading, immediate_goal)
 
@@ -78,69 +74,15 @@ class HeadingCalculator:
                 heading = -0.5
             self.previous_heading = heading
             # if abs(heading) > 0.5:
-            self.twist.linear.x = speed 
-            self.twist.angular.z = heading 
+            self.twist.linear.x = speed
+            self.twist.angular.z = heading
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
-            
         else:
             #remove the waypoint from the lis
             print(f"Reached waypoint no : {self.org_len - len(self.waypoints) + 1}: {self.waypoints[0]}")
-            self.waypoints.pop(0) 
+            self.waypoints.pop(0)
 
-    # def start_navigation(self):
-    #     '''Take the first waypoint
-    #        for each waypoint
-    #           calculate the heading between current pos and waypoint
-    #           if the heading is not in the range -45 to +45 degree then
-    #                 just go to +45 or -45 for now
-    #           else
-    #                 start going to the heading
-            
-    #         check if the distance between current pos and waypoint is less than 0.5 meters
-    #         then remove the waypoint from the list, and pick the first element from the 
-    #     '''
-    #     print("in the start navigation function")
-    #     initilize_time = rospy.Time.now()
-    #     while rospy.Time.now().to_sec() - initilize_time.to_sec() < 2.0:
-    #         print("moving for 1 sec")
-    #         self.twist.linear.x = 0.0
-    #         #print(f"twist: {self.twist}")
-    #         self.cmd_vel_pub.publish(self.twist)
-    #         self.rate.sleep()
-
-    #     # self.calculate_offset()
-
-    #     print("done moving for 1 sec")
-    #     while(len(self.waypoints) > 0):
-    #         while(HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal) > 1.2):
-    #                     print("Navigation is done")
-    #     exit(0)
-
-    # def publish_cmd_vel(self):
-    #     '''This function publishes the cmd_vel to the rover,
-    #        takes the twist as input, returns nothing'''
-    #     while not rospy.is_shutdown() and len(self.waypoints) > 0:
-    #         #print("publishing the cmd_vel")
-    #         #print(f"the twist is{self.twist}")
-    #         self.cmd_vel_pub.publish(self.twist)
-    #         self.cmd_vel_stamped_pub.publish(self.twist_stamped)
-    #         self.rate.sleep()
-        
-
-    #     print("No waypoints left, not publishing cmd_vel")
-
-    #calculate distance between two gps waypoints
-    # def check_acceptable_navigation(self, threshold_distance):
-    #     '''This function checks if the distance between the current position and all the waypoints is less than the threshold distance,
-    #        returns true/false'''
-    #     for each in self.waypoints:
-    #         if HeadingCalculator.distance_between_two_points(self, self.current_pos, each) > threshold_distance:
-    #             return False
-
-    #     return True 
-    #     # return self.radius_at_equator * c * 1000 #in meters 
-    
     def find_next_heading_to_waypoint(self, current_position, current_heading, waypoint):
         '''This function calculates the next heading to the waypoint,
         it takes the current_position, current_heading and waypoint as input,
@@ -197,52 +139,42 @@ class HeadingCalculator:
 
     #change the values of current_pos and current_heading everytime the pvt_callback is called
     def pvt_callback(self, data):
+        #print("In pvt callback")
         '''This function is called everytime the navigation message is received,
            it updates the current position and current heading of the rover, returns nothing'''
         self.current_pos = [data.lat * 1e-7, data.lon * 1e-7]
+        self.current_heading = data.heading * 1e-5
         self.ground_speed = data.gSpeed * 1e-3
-        self.cache_pvt_msg.add_element(data.heading * 1e-5) 
-        
+        self.navigation_started = True
+        #self.cache_pvt_msg.add_element(data.heading * 1e-5)
     def imu_callback(self, data):
         temp_yaw = np.degrees(self.uts.quaternion_to_yaw(data.orientation)) + self.offset 
         temp_yaw = -1 * temp_yaw
         temp_yaw = utils.round_up_angles(temp_yaw) 
         self.current_heading = temp_yaw
         self.cache_imu_msg.add_element(self.current_heading)
-
+        
     def hunter_callback(self, data):
         self.steering_angle = data.steering_angle
-
-    # def calculate_offset(self):
-    #     yaw_msgs = self.cache_imu_msg.get_all()
-    #     heading_msgs = self.cache_pvt_msg.get_all()
-
-    #     #     print(f"offset has been calculated at: {self.offset}")
-    #     local_offset = 0
-    #     for i in range(0, len(yaw_msgs)):
-    #         local_offset = local_offset + utils.substract_two_angles(yaw_msgs[i], heading_msgs[i])
-
-    #     # self.offset = local_offset / 10
-    #     self.offset = 0 
-    #     print(f"offset has been calculated at: {self.offset}")
 
 if __name__ == '__main__':
     rospy.init_node('HeadingCalculator')
     #initialize the class
     HeadingCalculatorNode = HeadingCalculator()
-    rospy_rate = rospy.Rate(50)
-    while not rospy.is_shutdown:
+    rospy_rate = rospy.Rate(30)
+    print("Node Initialized")
+    while not rospy.is_shutdown():
+        
         if len(HeadingCalculatorNode.waypoints) > 0:
-        # if not HeadingCalculatorNode.navigation_started and len(HeadingCalculatorNode.current_pos) > 0:
+            # if not HeadingCalculatorNode.navigation_started and len(HeadingCalculatorNode.current_pos) > 0:
             HeadingCalculatorNode.pid()
         else:
-            HeadingCalculator.twist.linear.x = 0.0
-            HeadingCalculator.twist.angular.z = 0.0
+            HeadingCalculatorNode.twist.linear.x = 0.0
+            HeadingCalculatorNode.twist.angular.z = 0.0
             print("No waypoints left, not publishing cmd_vel")
-    
             # twist_publisher_thread.join()
-        HeadingCalculator.cmd_vel_pub.publish(HeadingCalculator.twist)
-        HeadingCalculator.cmd_vel_stamped_pub.publish(HeadingCalculator.twist_stamped)
+        HeadingCalculatorNode.cmd_vel_pub.publish(HeadingCalculatorNode.twist)
+        #HeadingCalculator.cmd_vel_stamped_pub.publish(HeadingCalculator.twist_stamped)
         rospy_rate.sleep()
     rospy.spin()
 
