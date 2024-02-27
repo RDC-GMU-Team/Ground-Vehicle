@@ -91,12 +91,12 @@ void driveCallback( const std_msgs::Float32MultiArray&  control_msg ){
   last_msg_time = millis();
 
   //if emergency stop is triggered
-  if(control_msg.data[2] == 1.0 && millis() >= (1000 + last_emergency_stop))
-  {
-    emergency_stop = !emergency_stop;
-    last_emergency_stop = millis();
-    //flip to 1 for water sensor shut off
-  }
+  // if(control_msg.data[2] == 1.0 && millis() >= (1000 + last_emergency_stop))
+  // {
+  //   emergency_stop = !emergency_stop;
+  //   last_emergency_stop = millis();
+  //   //flip to 1 for water sensor shut off
+  // }
 
   //Handle for steering and throttle command
   //Map steering and throttle command to servo output
