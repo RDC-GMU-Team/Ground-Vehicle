@@ -91,12 +91,24 @@ void driveCallback( const std_msgs::Float32MultiArray&  control_msg ){
   last_msg_time = millis();
 
   //if emergency stop is triggered
+<<<<<<< Updated upstream
   // if(control_msg.data[2] == 1.0 && millis() >= (1000 + last_emergency_stop))
   // {
   //   emergency_stop = !emergency_stop;
   //   last_emergency_stop = millis();
   //   //flip to 1 for water sensor shut off
   // }
+=======
+  if(control_msg.data[2] == 1.0)
+  {
+    emergency_stop = 1;
+//    last_emergency_stop = millis();
+//    //flip to 1 for water sensor shut off
+  }
+  else if(control_msg.data[2] == 0.0){
+    emergency_stop = 0;
+  }
+>>>>>>> Stashed changes
 
   //Handle for steering and throttle command
   //Map steering and throttle command to servo output
@@ -180,9 +192,9 @@ void loop() {
   if((millis() - last_msg_time) > 1000){
     failSafeActive();
   }
-  else if(emergency_stop){
-    failSafeActive();
-  }
+//  else if(emergency_stop){
+//    failSafeActive();
+//  }
   //writes servo vals to servos
   else{
     steeringServo.writeMicroseconds(servo_values[0]);
