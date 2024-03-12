@@ -38,7 +38,7 @@ class HeadingCalculator:
         self.kd = 0.41
         self.ki = 0.010
         self.integrate = 0
-        self.goal_tolerance = 1.2
+        self.goal_tolerance = 2.2
         self.ground_speed = 0.0
         self.steering_angle = 0.0
         #read from csv and store it in a self.waypoints 
@@ -51,12 +51,12 @@ class HeadingCalculator:
         if HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal) > self.goal_tolerance:
             distance_between_two_points = HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal)
             if distance_between_two_points < 3.0:
-                speed = 0.15
+                speed = 0.75
             else:
                 speed = 1.0
 
             error = self.find_next_heading_to_waypoint(self.current_pos, self.current_heading, immediate_goal)
-
+            print(f"{error = }\n ")
             heading = self.kp * error + self.kd * (error - self.previous_error) + self.ki * self.integrate
             self.previous_error = error
             self.integrate += error
@@ -75,7 +75,7 @@ class HeadingCalculator:
             self.previous_heading = heading
             # if abs(heading) > 0.5:
             self.twist.linear.x = speed
-            self.twist.angular.z = heading
+            self.twist.angular.z = -heading
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
         else:
@@ -90,8 +90,15 @@ class HeadingCalculator:
         just go to +45 or -45 for now'''
         #first find the bearing using calculate heading function
         #then find the difference between current heading and bearing
-        difference_in_heading = self.difference_heading(current_heading, math.degrees(HeadingCalculator.calculate_heading(current_position, waypoint)))
-
+        heading_here = math.degrees(HeadingCalculator.calculate_heading(current_position, waypoint))
+        if heading_here < 0:
+            heading_here += 360
+        elif heading_here > 360:
+            heading_here -= 360
+        
+        #difference_in_heading = self.difference_heading(current_heading, math.degrees(HeadingCalculator.calculate_heading(current_position, waypoint)))
+        difference_in_heading = self.difference_heading(current_heading, heading_here)
+        #print(f"{heading_here = }, {current_heading = }, {difference_in_heading}")
         #implement the logic to find the next heading
         if difference_in_heading >= -28 and difference_in_heading <= 28:
             if abs(difference_in_heading) < 1:
@@ -101,6 +108,7 @@ class HeadingCalculator:
             return math.radians(-28)
         else:
             return math.radians(28)
+        return math.radians(difference_in_heading)
 
     #heading is in degrees
     def difference_heading(self, heading1, heading2):
@@ -147,11 +155,12 @@ class HeadingCalculator:
         self.ground_speed = data.gSpeed * 1e-3
         self.navigation_started = True
         #self.cache_pvt_msg.add_element(data.heading * 1e-5)
+
     def imu_callback(self, data):
         temp_yaw = np.degrees(self.uts.quaternion_to_yaw(data.orientation)) + self.offset 
         temp_yaw = -1 * temp_yaw
         temp_yaw = utils.round_up_angles(temp_yaw) 
-        self.current_heading = temp_yaw
+        #self.current_heading = temp_yaw
         self.cache_imu_msg.add_element(self.current_heading)
         
     def hunter_callback(self, data):
@@ -166,7 +175,6 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         
         if len(HeadingCalculatorNode.waypoints) > 0:
-            # if not HeadingCalculatorNode.navigation_started and len(HeadingCalculatorNode.current_pos) > 0:
             HeadingCalculatorNode.pid()
         else:
             HeadingCalculatorNode.twist.linear.x = 0.0

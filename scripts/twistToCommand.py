@@ -48,6 +48,7 @@ class twistControl(object):
         self.joytimeout = 3
         self.navtime = time.time()
         self.navTimeout = 2
+
         
         #throtle and steering multiplier
         self.thr_mul = 0.95
@@ -229,17 +230,13 @@ class twistControl(object):
                     else:
                         self.armed = False
                         #print("disarmed")
-                
-                if not self.automode:
-                    self.armed = False
 
                 #Camera angle control
                 # self.camangle = self.camangle + self.joystick.axes[7]
                 # if self.joystick.buttons[10] == 1:
                 #     self.camangle = self.def_pitch
                 #     print("Camera angle: " + str(self.camangle) )
-                    
-                
+
                 self.control_cmd.data[3] = self.gear
                 self.control_cmd.data[4] = self.fTLock
                 self.control_cmd.data[5] = self.rTLock
