@@ -4,6 +4,11 @@
     <param name="scheduler" value="fifo"/>
     <param name="priority" value="98"/>  
   </node>
+  
+  <node pkg ="ugv" type ="waterlog.py" name ="water_logger">
+    <param name="scheduler" value="fifo"/>
+    <param name="priority" value="98"/>  
+  </node>
 
   <!-- Launch rosserial_python node -->
   <node pkg="rosserial_python" type="serial_node.py" name="serial_node">
@@ -11,7 +16,7 @@
   </node>
 
   <!-- Launch joy node -->
-  <node pkg="joy" type="joy_node" name="joy_node"/>
+  <node pkg="joy" type="joy_node" name="joy_node">
   	<param name="port" type="string" value="/dev/input/js0" />
   </node>
   

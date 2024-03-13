@@ -6,6 +6,7 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/Int16MultiArray.h>
+#include <std_msgs/Bool.h>
 
 // Global variables and ROS setup
 ros::NodeHandle nodeHandle;
@@ -32,6 +33,7 @@ int sensorValue = 0;
 // Other global variables
 int servo_values[6];
 unsigned long last_msg_time = 0;
+unsigned long water_strike = 0;
 unsigned long brk_timer = 0;
 bool prev_dir = 0;
 bool emergency_stop = 0;
@@ -55,7 +57,8 @@ std_msgs::Int16MultiArray rpmVal;
 ros::Publisher rpmVal_data("rpmVal_data", &rpmVal);
 std_msgs::Int16MultiArray optiFlow;
 ros::Publisher optiFlow_data("optiFlow_data", &optiFlow);
-
+std_msgs::Bool waterHit;
+ros::Publisher water_log("water_log", &waterHit);
 
 void setup() {
   Serial.begin(57600); // Adjust as necessary for integration
@@ -63,6 +66,7 @@ void setup() {
   // ROS initialization
   nodeHandle.initNode();
   nodeHandle.subscribe(driveSubscriber);
+  nodeHandle.advertise(water_log);
 
   // Linking servos to outputs
   steeringServo.attach(STEERING_OUT);
@@ -79,32 +83,74 @@ void setup() {
 
 void loop() {
   // Initial functionality for ROS and servo control
-  unsigned long cur_millis = millis();
-  if((millis() - last_msg_time) > 1000){
-    failSafeActive();
-  } else {
-    steeringServo.writeMicroseconds(servo_values[0]);
-    throttleServo.writeMicroseconds(servo_values[1]);
-  }
-  nodeHandle.spinOnce();
-  delayMicroseconds(100);
-
-  // Updated Water_sensor code functionality with new pin assignments
-  sensorValue = analogRead(analogInPin);
-  Serial.print("sensor = ");
-  Serial.println(sensorValue);
-  if((sensorValue >= 100) && (sensorValue <= 600)) {
-    digitalWrite(ADDITIONAL_OUT_1, HIGH);
-    digitalWrite(ADDITIONAL_OUT_2, HIGH);
-    digitalWrite(ADDITIONAL_OUT_3, HIGH);
-    digitalWrite(ADDITIONAL_OUT_4, HIGH);
-  } else {
+  if(emergency_stop == 0 || emergency_stop == 2)
+  {
+    unsigned long cur_millis = millis();
+    if((millis() - last_msg_time) > 1000){
+      failSafeActive();
+    } else {
+      int speed_cap = 1583;
+      int throttle_speed = servo_values[1];
+      if(throttle_speed > speed_cap)
+      {
+        throttle_speed = speed_cap;
+      }
+      steeringServo.writeMicroseconds(servo_values[0]);
+      throttleServo.writeMicroseconds(throttle_speed);
+    }
     digitalWrite(ADDITIONAL_OUT_1, LOW);
     digitalWrite(ADDITIONAL_OUT_2, LOW);
     digitalWrite(ADDITIONAL_OUT_3, LOW);
     digitalWrite(ADDITIONAL_OUT_4, LOW);
   }
-  delay(100); // Adjust delay as necessary
+
+  if(emergency_stop == 0)
+  {
+    // Updated Water_sensor code functionality with new pin assignments
+    sensorValue = analogRead(analogInPin);
+    Serial.print("sensor = ");
+    Serial.println(sensorValue);
+    if((sensorValue >= 100) && (sensorValue <= 600)) {
+      digitalWrite(ADDITIONAL_OUT_1, HIGH);
+      digitalWrite(ADDITIONAL_OUT_2, HIGH);
+      digitalWrite(ADDITIONAL_OUT_3, HIGH);
+      digitalWrite(ADDITIONAL_OUT_4, HIGH);
+      if(emergency_stop = 0)
+      {
+        waterHit.data = true;
+        water_log.publish(&waterHit);    
+        emergency_stop = 1;
+        water_strike = millis();
+      }
+      else
+      {
+        waterHit.data = false;
+        water_log.publish(&waterHit);
+      }
+    } else {
+      waterHit.data = false;
+      water_log.publish(&waterHit);
+    }
+  }
+  
+  
+  //while emergency stop is 1, the rover should lock up. Set emergency stop to 2 after 1 minute.
+  if(emergency_stop == 1)
+  {
+    failSafeActive();
+    if((millis() - last_msg_time) > 60000)
+    {
+      emergency_stop == 2
+      digitalWrite(ADDITIONAL_OUT_1, LOW);
+      digitalWrite(ADDITIONAL_OUT_2, LOW);
+      digitalWrite(ADDITIONAL_OUT_3, LOW);
+      digitalWrite(ADDITIONAL_OUT_4, LOW);
+    }
+  }
+  //while emergency stop is 2, the rover should just finish the course.
+  nodeHandle.spinOnce();
+  delayMicroseconds(100);
+
 }
 
 //maps a float from -1 to 1 to 1000 to 2000
