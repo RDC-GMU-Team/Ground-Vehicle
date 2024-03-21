@@ -38,7 +38,7 @@ class HeadingCalculator:
         self.kd = 0.41
         self.ki = 0.010
         self.integrate = 0
-        self.goal_tolerance = 2.2
+        self.goal_tolerance = 1.0
         self.ground_speed = 0.0
         self.steering_angle = 0.0
         #read from csv and store it in a self.waypoints 
@@ -56,7 +56,6 @@ class HeadingCalculator:
                 speed = 1.0
 
             error = self.find_next_heading_to_waypoint(self.current_pos, self.current_heading, immediate_goal)
-            print(f"{error = }\n ")
             heading = self.kp * error + self.kd * (error - self.previous_error) + self.ki * self.integrate
             self.previous_error = error
             self.integrate += error

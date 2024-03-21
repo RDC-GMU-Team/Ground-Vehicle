@@ -15,6 +15,7 @@ ros::NodeHandle nodeHandle;
 const int minSteering = 1000;
 const int maxSteering = 2000;
 const int brk_delay = 500;
+const int speed_cap = 1609;
 
 // Output pins for Arduino, specific to servo control
 static const int STEERING_OUT = 2; // Steering servo output
@@ -89,13 +90,35 @@ void loop() {
     if((millis() - last_msg_time) > 1000){
       failSafeActive();
     } else {
-      int speed_cap = 1583;
       int throttle_speed = servo_values[1];
       if(throttle_speed > speed_cap)
       {
         throttle_speed = speed_cap;
       }
-      steeringServo.writeMicroseconds(servo_values[0]);
+
+      int steering_level = servo_values[0];
+      if(steering_level > 1650)
+      {
+        steering_level = 2000;
+        /*
+        throttle_speed = ((throttle_speed - 1500) * 3) + 1500;
+        if(throttle_speed > 2000)
+        {
+          throttle_speed = 2000;
+        }
+        else if(throttle_speed < 1000)
+        {
+          throttle_speed = 1000;
+        }
+        */
+      }
+      else if(steering_level < 1350)
+      {
+        steering_level = 1000;
+      }
+      
+      steeringServo.writeMicroseconds(steering_level);
+      
       throttleServo.writeMicroseconds(throttle_speed);
     }
     digitalWrite(ADDITIONAL_OUT_1, LOW);
@@ -140,7 +163,7 @@ void loop() {
     failSafeActive();
     if((millis() - last_msg_time) > 60000)
     {
-      emergency_stop == 2
+      emergency_stop == 2;
       digitalWrite(ADDITIONAL_OUT_1, LOW);
       digitalWrite(ADDITIONAL_OUT_2, LOW);
       digitalWrite(ADDITIONAL_OUT_3, LOW);
@@ -208,6 +231,10 @@ void failSafeActive(){
 void driveCallback( const std_msgs::Float32MultiArray&  control_msg ){
   //timestamp the  last ros message
   last_msg_time = millis();
+  
+  if(control_msg.data[2] == 1.0){
+    emergency_stop = 0;
+  }
 /*
   //if emergency stop is triggered
   if(control_msg.data[2] == 1.0)
