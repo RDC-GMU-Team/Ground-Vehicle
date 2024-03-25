@@ -31,6 +31,8 @@ class HeadingCalculator:
         self.cache_pvt_msg = utils.CacheHeaderlessROSMessage(5)
         self.cache_imu_msg = utils.CacheHeaderlessROSMessage(5)
 
+        self.waypoint_val = False
+
         self.rate = rospy.Rate(30)
         self.radius_at_equator = 6371 #km
         self.current_pos = []
@@ -79,13 +81,10 @@ class HeadingCalculator:
             self.twist.angular.z = -heading * 3
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
-            waypoint_val = False
-            self.waypoint_pub.publish(waypoint_val)
         else:
             #remove the waypoint from the lis
             print(f"Reached waypoint no : {self.org_len - len(self.waypoints) + 1}: {self.waypoints[0]}")
-            waypoint_val = False
-            self.waypoint_pub.publish(waypoint_val)
+            self.waypoint_val = True
             self.waypoints.pop(0)
 
     def find_next_heading_to_waypoint(self, current_position, current_heading, waypoint):
@@ -187,6 +186,8 @@ if __name__ == '__main__':
             print("No waypoints left, not publishing cmd_vel")
             # twist_publisher_thread.join()
         HeadingCalculatorNode.cmd_vel_pub.publish(HeadingCalculatorNode.twist)
+        HeadingCalculatorNode.waypoint_pub.publish(HeadingCalculatorNode.waypoint_val)
+        HeadingCalculatorNode.waypoint_val = False
         #HeadingCalculator.cmd_vel_stamped_pub.publish(HeadingCalculator.twist_stamped)
         rospy_rate.sleep()
     rospy.spin()
