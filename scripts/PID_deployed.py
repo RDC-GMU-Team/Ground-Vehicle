@@ -3,6 +3,7 @@
 import rospy
 from ublox_msgs.msg import NavPVT
 from geometry_msgs.msg import TwistWithCovarianceStamped, TwistStamped, Twist
+from std_msgs.msg import Bool
 import utils
 from utilities import utils as uts
 
@@ -22,6 +23,7 @@ class HeadingCalculator:
         self.org_len = len(self.waypoints)
         self.pvt_sub = rospy.Subscriber('/f9p_rover/navpvt', NavPVT, self.pvt_callback)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
+        self.waypoint_pub = rospy.Publisher('/waypoint', Bool, queue_size=10)
         self.uts = uts()
 
         self.twist = Twist()
@@ -74,12 +76,16 @@ class HeadingCalculator:
             self.previous_heading = heading
             # if abs(heading) > 0.5:
             self.twist.linear.x = speed
-            self.twist.angular.z = -heading
+            self.twist.angular.z = -heading * 3
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
+            waypoint_val = False
+            self.waypoint_pub.publish(waypoint_val)
         else:
             #remove the waypoint from the lis
             print(f"Reached waypoint no : {self.org_len - len(self.waypoints) + 1}: {self.waypoints[0]}")
+            waypoint_val = False
+            self.waypoint_pub.publish(waypoint_val)
             self.waypoints.pop(0)
 
     def find_next_heading_to_waypoint(self, current_position, current_heading, waypoint):

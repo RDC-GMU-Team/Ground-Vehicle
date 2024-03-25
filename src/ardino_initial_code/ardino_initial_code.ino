@@ -36,6 +36,7 @@ int servo_values[6];
 unsigned long last_msg_time = 0;
 unsigned long water_strike = 0;
 unsigned long brk_timer = 0;
+unsigned long turn_boost = 0;
 bool prev_dir = 0;
 bool emergency_stop = 0;
 unsigned long last_emergency_stop = 0;
@@ -51,9 +52,11 @@ float fw_to_rev(float th);
 float rev_to_fw();
 void failSafeActive();
 void driveCallback(const std_msgs::Float32MultiArray& control_msg);
+void waypointCallback( const std_msgs::Bool& msg); 
 
 // ROS Subscribers and Publishers
 ros::Subscriber<std_msgs::Float32MultiArray> driveSubscriber("/cmd_vel1", &driveCallback);
+ros::Subscriber<std_msgs::Bool>waypointSubscriber("/waypoint", &waypointCallback);
 std_msgs::Int16MultiArray rpmVal;
 ros::Publisher rpmVal_data("rpmVal_data", &rpmVal);
 std_msgs::Int16MultiArray optiFlow;
@@ -95,12 +98,12 @@ void loop() {
       {
         throttle_speed = speed_cap;
       }
-
+      
       int steering_level = servo_values[0];
-      if(steering_level > 1650)
+      /*
+      if(steering_level > 1660)
       {
         steering_level = 2000;
-        /*
         throttle_speed = ((throttle_speed - 1500) * 3) + 1500;
         if(throttle_speed > 2000)
         {
@@ -110,11 +113,25 @@ void loop() {
         {
           throttle_speed = 1000;
         }
-        */
       }
-      else if(steering_level < 1350)
+      else if(steering_level < 1340)
       {
         steering_level = 1000;
+        throttle_speed = ((throttle_speed - 1500) * 3) + 1500;
+        if(throttle_speed > 2000)
+        {
+          throttle_speed = 2000;
+        }
+        else if(throttle_speed < 1000)
+        {
+          throttle_speed = 1000;
+        }
+      }
+      */
+
+      if(millis() < turn_boost + 1000)
+      {
+        throttle_speed = 2000; 
       }
       
       steeringServo.writeMicroseconds(steering_level);
@@ -224,7 +241,16 @@ float rev_to_fw(){
 //failsafe for if we have no input- puts throttle to 0 and steering to a neutral place
 void failSafeActive(){
   throttleServo.writeMicroseconds(1500);
-  steeringServo.writeMicroseconds(1850);
+  steeringServo.writeMicroseconds(1600);
+}
+
+//waypoint callback
+void waypointCallback( const std_msgs::Bool& msg) {
+  //start a timer when a true comes down
+  if(msg.data)
+  {
+    turn_boost = millis();
+  }
 }
 
 //main method for reading from ros
