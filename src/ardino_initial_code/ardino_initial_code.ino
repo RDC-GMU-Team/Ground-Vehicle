@@ -6,7 +6,8 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/Int16MultiArray.h>
-#include <std_msgs/Bool.h>
+//#include <std_msgs/Bool.h>
+#include <std_msgs/Int8.h>
 
 // Global variables and ROS setup
 ros::NodeHandle nodeHandle;
@@ -15,7 +16,7 @@ ros::NodeHandle nodeHandle;
 const int minSteering = 1000;
 const int maxSteering = 2000;
 const int brk_delay = 500;
-const int speed_cap = 1609;
+const int speed_cap = 2000;
 
 // Output pins for Arduino, specific to servo control
 static const int STEERING_OUT = 2; // Steering servo output
@@ -38,7 +39,7 @@ unsigned long water_strike = 0;
 unsigned long brk_timer = 0;
 unsigned long turn_boost = 0;
 bool prev_dir = 0;
-bool emergency_stop = 0;
+int emergency_stop = 0;
 unsigned long last_emergency_stop = 0;
 float throttle_cmd;
 
@@ -52,16 +53,16 @@ float fw_to_rev(float th);
 float rev_to_fw();
 void failSafeActive();
 void driveCallback(const std_msgs::Float32MultiArray& control_msg);
-void waypointCallback( const std_msgs::Bool& msg); 
+//void waypointCallback( const std_msgs::Int8& msg); 
 
 // ROS Subscribers and Publishers
 ros::Subscriber<std_msgs::Float32MultiArray> driveSubscriber("/cmd_vel1", &driveCallback);
-ros::Subscriber<std_msgs::Bool>waypointSubscriber("/waypoint", &waypointCallback);
+//ros::Subscriber<std_msgs::Bool> waypointSubscriber("/waypoint", &waypointCallback);
 std_msgs::Int16MultiArray rpmVal;
 ros::Publisher rpmVal_data("rpmVal_data", &rpmVal);
 std_msgs::Int16MultiArray optiFlow;
 ros::Publisher optiFlow_data("optiFlow_data", &optiFlow);
-std_msgs::Bool waterHit;
+std_msgs::Int8 waterHit;
 ros::Publisher water_log("water_log", &waterHit);
 
 void setup() {
@@ -92,7 +93,8 @@ void loop() {
     unsigned long cur_millis = millis();
     if((millis() - last_msg_time) > 1000){
       failSafeActive();
-    } else {
+    } 
+    else {
       int throttle_speed = servo_values[1];
       if(throttle_speed > speed_cap)
       {
@@ -128,12 +130,13 @@ void loop() {
         }
       }
       */
-
+      /*
+      //boost on waypoint strike
       if(millis() < turn_boost + 1000)
       {
-        throttle_speed = 2000; 
+        throttle_speed = 2000; // max speed 
       }
-      
+      */
       steeringServo.writeMicroseconds(steering_level);
       
       throttleServo.writeMicroseconds(throttle_speed);
@@ -148,27 +151,19 @@ void loop() {
   {
     // Updated Water_sensor code functionality with new pin assignments
     sensorValue = analogRead(analogInPin);
-    Serial.print("sensor = ");
-    Serial.println(sensorValue);
-    if((sensorValue >= 100) && (sensorValue <= 600)) {
-      digitalWrite(ADDITIONAL_OUT_1, HIGH);
-      digitalWrite(ADDITIONAL_OUT_2, HIGH);
-      digitalWrite(ADDITIONAL_OUT_3, HIGH);
-      digitalWrite(ADDITIONAL_OUT_4, HIGH);
-      if(emergency_stop = 0)
-      {
-        waterHit.data = true;
+    //Serial.print("sensor = ");
+    //Serial.println(sensorValue);
+    if((sensorValue >= 100)) {
+        //digitalWrite(ADDITIONAL_OUT_1, HIGH);
+        //digitalWrite(ADDITIONAL_OUT_2, HIGH);
+        //digitalWrite(ADDITIONAL_OUT_3, HIGH);
+        //digitalWrite(ADDITIONAL_OUT_4, HIGH);
+        waterHit.data = 1; 
         water_log.publish(&waterHit);    
-        emergency_stop = 1;
+        //emergency_stop = 1;
         water_strike = millis();
-      }
-      else
-      {
-        waterHit.data = false;
-        water_log.publish(&waterHit);
-      }
     } else {
-      waterHit.data = false;
+      waterHit.data = 0;
       water_log.publish(&waterHit);
     }
   }
@@ -178,9 +173,9 @@ void loop() {
   if(emergency_stop == 1)
   {
     failSafeActive();
-    if((millis() - last_msg_time) > 60000)
+    if((millis() - water_strike) > 10000)
     {
-      emergency_stop == 2;
+      emergency_stop = 0;
       digitalWrite(ADDITIONAL_OUT_1, LOW);
       digitalWrite(ADDITIONAL_OUT_2, LOW);
       digitalWrite(ADDITIONAL_OUT_3, LOW);
@@ -245,13 +240,22 @@ void failSafeActive(){
 }
 
 //waypoint callback
-void waypointCallback( const std_msgs::Bool& msg) {
+/*
+void waypointCallback(const std_msgs::Bool& msg) {
   //start a timer when a true comes down
   if(msg.data)
   {
     turn_boost = millis();
+    waterHit.data = true; 
+    water_log.publish(&waterHit); 
+  }
+  else
+  {
+    waterHit.data = false; 
+    water_log.publish(&waterHit); 
   }
 }
+*/
 
 //main method for reading from ros
 void driveCallback( const std_msgs::Float32MultiArray&  control_msg ){

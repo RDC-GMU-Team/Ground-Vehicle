@@ -38,13 +38,14 @@ class HeadingCalculator:
         self.current_pos = []
         self.offset = 0
         self.previous_error = 0
-        self.kp = 0.65
-        self.kd = 0.41
-        self.ki = 0.010
+        self.kp = 0.75
+        self.kd = 0.35
+        self.ki = 0.015
         self.integrate = 0
         self.goal_tolerance = 1.0
         self.ground_speed = 0.0
         self.steering_angle = 0.0
+        self.offset = 0.0
         #read from csv and store it in a self.waypoints 
 
     def pid(self):
@@ -55,7 +56,7 @@ class HeadingCalculator:
         if HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal) > self.goal_tolerance:
             distance_between_two_points = HeadingCalculator.distance_between_two_points(self, self.current_pos, immediate_goal)
             if distance_between_two_points < 3.0:
-                speed = 0.75
+                speed = 1.0
             else:
                 speed = 1.0
 
@@ -71,13 +72,22 @@ class HeadingCalculator:
             if abs(error) < 0.04:
                 self.integrate = 0
 
-            if heading > 0.5:
-                heading = 0.5
-            elif heading < -0.5:
-                heading = -0.5
+            if heading > 1.0:
+                heading = 1.0
+            elif heading < -1.0:
+                heading = -1.0
             self.previous_heading = heading
             # if abs(heading) > 0.5:
-            self.twist.linear.x = speed
+
+            
+            oft = np.abs(heading)
+            if oft < 0.1:
+                self.offset/1.5    
+            else:
+                self.offset = 0.8*self.offset + 0.2*np.abs(heading)
+
+            ##adjust the multiplier to  get higher speed when turning
+            self.twist.linear.x = np.min([speed, 0.218]) + self.offset * 0.05
             self.twist.angular.z = -heading * 3
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
