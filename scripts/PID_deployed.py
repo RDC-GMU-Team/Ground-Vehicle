@@ -38,9 +38,9 @@ class HeadingCalculator:
         self.current_pos = []
         self.offset = 0
         self.previous_error = 0
-        self.kp = 0.75
-        self.kd = 0.35
-        self.ki = 0.015
+        self.kp = 2.0
+        self.kd = 0.41
+        self.ki = 0.010
         self.integrate = 0
         self.goal_tolerance = 1.0
         self.ground_speed = 0.0
@@ -87,8 +87,9 @@ class HeadingCalculator:
                 self.offset = 0.8*self.offset + 0.2*np.abs(heading)
 
             ##adjust the multiplier to  get higher speed when turning
-            self.twist.linear.x = np.min([speed, 0.218]) + self.offset * 0.05
-            self.twist.angular.z = -heading * 3
+            modifier = 0.218
+            self.twist.linear.x = np.min([speed, modifier]) + self.offset * (0.1 * modifier)
+            self.twist.angular.z = (-heading * 1)
             self.twist_stamped.twist = self.twist
             self.twist_stamped.header.stamp = rospy.Time.now()
         else:
@@ -116,13 +117,12 @@ class HeadingCalculator:
         #implement the logic to find the next heading
         if difference_in_heading >= -28 and difference_in_heading <= 28:
             if abs(difference_in_heading) < 1:
-                return math.radians(0)
+                return math.radians(difference_in_heading)
             return math.radians(difference_in_heading)
         elif difference_in_heading < -28:
             return math.radians(-28)
         else:
             return math.radians(28)
-        return math.radians(difference_in_heading)
 
     #heading is in degrees
     def difference_heading(self, heading1, heading2):
