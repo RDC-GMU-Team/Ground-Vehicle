@@ -38,9 +38,9 @@ class HeadingCalculator:
         self.current_pos = []
         self.offset = 0
         self.previous_error = 0
-        self.kp = 2.0
-        self.kd = 0.41
-        self.ki = 0.010
+        self.kp = 3.0
+        self.kd = 0.75
+        self.ki = 0.25 #0.010
         self.integrate = 0
         self.goal_tolerance = 1.0
         self.ground_speed = 0.0
@@ -61,6 +61,7 @@ class HeadingCalculator:
                 speed = 1.0
 
             error = self.find_next_heading_to_waypoint(self.current_pos, self.current_heading, immediate_goal)
+            error -= 0.05236
             heading = self.kp * error + self.kd * (error - self.previous_error) + self.ki * self.integrate
             self.previous_error = error
             self.integrate += error
@@ -87,7 +88,7 @@ class HeadingCalculator:
                 self.offset = 0.8*self.offset + 0.2*np.abs(heading)
 
             ##adjust the multiplier to  get higher speed when turning
-            modifier = 0.218
+            modifier = 1.0
             self.twist.linear.x = np.min([speed, modifier]) + self.offset * (0.1 * modifier)
             self.twist.angular.z = (-heading * 1)
             self.twist_stamped.twist = self.twist
@@ -114,10 +115,11 @@ class HeadingCalculator:
         #difference_in_heading = self.difference_heading(current_heading, math.degrees(HeadingCalculator.calculate_heading(current_position, waypoint)))
         difference_in_heading = self.difference_heading(current_heading, heading_here)
         #print(f"{heading_here = }, {current_heading = }, {difference_in_heading}")
-        #implement the logic to find the next heading
+        print(f'difference heading {difference_in_heading}')
+	#implement the logic to find the next heading
         if difference_in_heading >= -28 and difference_in_heading <= 28:
             if abs(difference_in_heading) < 1:
-                return math.radians(difference_in_heading)
+                return math.radians(0)
             return math.radians(difference_in_heading)
         elif difference_in_heading < -28:
             return math.radians(-28)
@@ -201,5 +203,3 @@ if __name__ == '__main__':
         #HeadingCalculator.cmd_vel_stamped_pub.publish(HeadingCalculator.twist_stamped)
         rospy_rate.sleep()
     rospy.spin()
-
-
