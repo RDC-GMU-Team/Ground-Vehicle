@@ -61,7 +61,7 @@ class HeadingCalculator:
                 speed = 1.0
 
             error = self.find_next_heading_to_waypoint(self.current_pos, self.current_heading, immediate_goal)
-            error -= 0.05236
+            #error -= 0.05236
             heading = self.kp * error + self.kd * (error - self.previous_error) + self.ki * self.integrate
             self.previous_error = error
             self.integrate += error

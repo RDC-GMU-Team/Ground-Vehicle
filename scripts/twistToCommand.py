@@ -187,7 +187,7 @@ class twistControl(object):
                     #Throttle Control forward
                     if self.joystick.axes[4] == 0:
                         self.throttle = ((1 - self.joystick.axes[5])/2)*((1 - self.joystick.axes[5])/2)
-                        self.control_cmd.data[1] = self.throttle
+                        self.control_cmd.data[1] = min(self.throttle, 1.0)
                 
                     #throttle Control reverse    
                     if self.joystick.axes[4] == -1:
@@ -224,7 +224,7 @@ class twistControl(object):
                         self.armed = False
                 
                 if self.automode or self.armed:
-                    if self.joystick.axes[2] == -1:
+                    if self.joystick.axes[2] == 1.0:
                         self.armed = True
                         #print("Armed")
                     else:

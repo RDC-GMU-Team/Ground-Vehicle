@@ -1,174 +1,209 @@
-import math
+import rospy
+from geometry_msgs.msg import PoseStamped, Twist, Pose, Point, Quaternion
+from nav_msgs.msg import Path , Odometry
+import csv
+#from grid_map_msgs.msg import GridMap
+
 import numpy as np
-import pandas as pd
+import math
+import torch
+import pyproj
 
-class CacheROSMessage:
-    def __init__(self, max_size=100):
-        self.max_size = max_size
-        self.cache = []
-        self.time = []
-
-    #add element in the cache
-    def add_element(self, data):
-        if len(self.cache) >= self.max_size:
-            self.time.pop(0)
-            self.cache.pop(0)
-
-        self.cache.append(data)
-        self.time.append(data.header.stamp.secs)
-
-    #get all the elements in the cache    
-    def get_all(self):
-        return self.cache
+#Class for general functions
+class utilities:
+    def __init__(self):
+        self.queue_size = 0
     
-    #clear the cache
-    def clear_cache(self):
-        self.cache = []
-        self.time = []
+    #map value from one range to another
+    def map_value(self, value, from_min, from_max, to_min, to_max):
+        # Calculate the range of the input value
+        from_range = from_max - from_min
+
+        # Calculate the range of the output value
+        to_range = to_max - to_min
+
+        # Scale the input value to the output range
+        mapped_value = (value - from_min) * (to_range / from_range) + to_min
+
+        return mapped_value
     
-    #get element at a particular index
-    def get_index(self, index):
-        return self.cache[index]
-
-    #get element from a particular time or return None
-    def get_element_from_time(self, time):
-        if time not in self.time:
-            return None
-
-        index = self.time.index(time)
-        return self.cache[index]
-
-    #get the oldest element in the cache       
-    def get_oldest_element(self):
-        return self.cache[0]
-   
-    #get the latest n elements in the cache, if n > cache size, return None
-    def get_last_n_elements(self, n):
-        if n > len(self.cache):
-            return self.get_all()
-
-        return self.cache[-n:]
-
-class CacheHeaderlessROSMessage:
-    def __init__(self, max_size=100):
-        self.max_size = max_size
-        self.cache = []
-
-    #add element in the cache
-    def add_element(self, data):
-        if len(self.cache) >= self.max_size:
-            self.cache.pop(0)
-
-        self.cache.append(data)
-
-    #get all the elements in the cache    
-    def get_all(self):
-        return self.cache
+    # read goal points from csv file
+    def csv_to_goals(self, filename):
+        # Load the CSV file
+        waypoints = []
+        with open(filename, mode='r') as file:
+            csv_reader = csv.reader(file)
+            for row in csv_reader:
+                x, y = map(float, row)
+                waypoints.append((x, y))
+        return waypoints
     
-    #clear the cache
-    def clear_cache(self):
-        self.cache = []
-        self.time = []
-    
-    #get element at a particular index
-    def get_index(self, index):
-        return self.cache[index]
-
-    #get the oldest element in the cache       
-    def get_oldest_element(self):
-        return self.cache[0]
-
-    def get_last_element(self):
-        if len(self.cache) == 0:
-            return None
+    # convert lat lon to x y
+    def gps_to_xy(self, latitude, longitude):
+        projection = pyproj.Proj("+proj=utm +zone=18 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
         
-        return self.cache[-1]
+        #x, y = pyproj.transform(projection, projection.inv, longitude, latitude)
+        x, y = projection(longitude, latitude)
+        return np.array([x, y], dtype=np.float32)
 
-    #get the latest n elements in the cache, if n > cache size, return None
-    def get_last_n_elements(self, n):
-        if n > len(self.cache):
-            return self.get_all()
+    # clamp angles
+    def clamp_angle(self, angles):
+        angles += np.pi
+        angles %= (2 * np.pi)
+        angles -= np.pi
+        return angles
+    
+    # convert angle from 0-360 to -pi to pi
+    def gps_to_normal_heading(self, angle_degrees):
+        """Converts an angle from 0-360 degrees to the equivalent angle within -180 to 180 radians.
 
-        return self.cache[-n:]
+        Args:
+            angle_degrees (float): The angle in degrees.
 
+        Returns:
+            float: The angle in radians, within the range of -180 to 180.
+        """  
+        # Bring angle within 0 to 360 range
+        angle_degrees = angle_degrees % 360
 
-def read_csv(filename):
-    df = pd.read_csv(filename)
-    return df.values.tolist()
+        # Convert to radians
+        angle_radians = np.radians(angle_degrees)
 
-def substract_two_angles(angle1, angle2):
-    #calculate the difference between two angles
-    diff = angle1 - angle2
-    if diff > 180:
-        diff = 360 - diff  
-    elif diff < -180:
-        diff = diff + 360
-    return diff
+        # Shift to -180 to 180 range
+        if angle_radians > np.pi:
+            angle_radians -= 2 * np.pi
 
-def round_up_angles(angle):
-    if angle < 0:
-        angle = angle + 360
-    elif angle > 360:
-        angle = angle - 360
-    return angle 
+        return -angle_radians
+    
+    # Convert quaternion to yaw angle (in radians)
+    def quaternion_to_yaw(self, quaternion):
+        quaternion_norm = math.sqrt(quaternion.x**2 + quaternion.y**2 + quaternion.z**2 + quaternion.w**2)
+        if (quaternion_norm == 0):
+            return 0.0
+        quaternion.x /= quaternion_norm
+        quaternion.y /= quaternion_norm
+        quaternion.z /= quaternion_norm
+        quaternion.w /= quaternion_norm
 
-def euclidean_distance(self, x1, y1, x2, y2):
-    return math.sqrt((x1-x2)**2 + (y1-y2)**2)
+        yaw = math.atan2(2.0 * (quaternion.w * quaternion.z + quaternion.x * quaternion.y),
+                         1.0 - 2.0 * (quaternion.y**2 + quaternion.z**2))
 
-def check_matching_pose(x1, y1, x2, y2):
-    if abs(x1 - x2) < 0.5 and abs(y1 - y2) < 0.5:
-        return True
-    else:
-        return False
+        return yaw
+    
+    # Convert yaw angle (in radians) to quaternion
+    def yaw_to_quaternion(self, yaw):
+        quaternion = Quaternion()
+        quaternion.x = 0.0
+        quaternion.y = 0.0
+        quaternion.z = math.sin(yaw / 2.0)
+        quaternion.w = math.cos(yaw / 2.0)
+        return quaternion
+    
+    # Get distance between two poses
+    def get_dist(self, start_pose, goal_pose):
+        if start_pose is None or goal_pose is None:
+            return 0.0
+        
+        if start_pose.ndim == 1:  # Handle single pose case
+            start_pose = np.expand_dims(start_pose, axis=0)
+        
+        goal_expanded = np.expand_dims(goal_pose, axis=0)
+        squared_diff = np.sum((start_pose[:,:2] - goal_expanded[:,:2]) ** 2, axis=1)
+        return np.sqrt(squared_diff)
 
-def find_next_heading_to_waypoint(current_position, current_heading, waypoint):
-    '''This function calculates the next heading to the waypoint,
-    it takes the current_position, current_heading and waypoint as input,
-    outputs the next heading in radians, if the heading is not in the range -45 to +45 degree then
-    just go to +45 or -45 for now'''
-    #first find the bearing using calculate heading function
-    #then find the difference between current heading and bearing
-    difference_in_heading = difference_heading(current_heading, math.degrees(calculate_heading(current_position, waypoint)))
+    # Create a Pose message from a position and orientation
+    def create_pose_stamped(self, pose):
+        # Create a PoseStamped message from a Pose message
+        pose_stamped = PoseStamped()
+        pose_stamped.pose = pose
+        pose_stamped.header.stamp = rospy.Time.now()
+        pose_stamped.header.frame_id = 'odom'  # Replace 'world' with your desired frame ID
 
-    #implement the logic to find the next heading
-    if difference_in_heading >= -28 and difference_in_heading <= 28:
-        if abs(difference_in_heading) < 1:
-            return math.radians(0)
-        return math.radians(difference_in_heading)
-    elif difference_in_heading < -28:
-        return math.radians(-28)
-    else:
-        return math.radians(28)
+        return pose_stamped
+    
+    # Ackermann model for calculating pose change
+    def ackermann_model(self, velocity, steering, wheelbase, dt):
+        # Initialize the pose change
+        pose_change = np.zeros((velocity.shape[0], 3), dtype=np.float32)
 
-#heading is in degrees
-def difference_heading(heading1, heading2):
-    '''This function calculates the difference between two headings,
-    rounds up the heading if the difference is greater than 180 degrees,
-    needs input in degrees, returns the difference in degrees'''
-    diff = heading1 - heading2
-    if diff > 180:
-        diff = diff - 360
-    elif diff < -180:
-        diff = diff + 360
-    return diff
+        # Calculate the change in orientation (dtheta)
+        dtheta = velocity / wheelbase * np.tan(steering) * dt
 
-#Calculate heading between two gps coordinates
-def calculate_heading(CoordinateA,CoordinateB):
-    '''Calculates the heading between two gps coordinates,
-        returns the heading in radians'''
-    X = math.cos(CoordinateB[0]) * math.sin(CoordinateB[1] - CoordinateA[1])
-    Y = math.cos(CoordinateA[0]) * math.sin(CoordinateB[0]) - math.sin(CoordinateA[0]) * math.cos(CoordinateB[0]) * math.cos(CoordinateB[1] - CoordinateA[1])
+        # Calculate change in x and y coordinates
+        dx = velocity * np.cos(dtheta) * dt
+        dy = velocity * np.sin(dtheta) * dt
+    
+        pose_change[:, 0] = dx
+        pose_change[:, 1] = dy
+        pose_change[:, 2] = dtheta
 
-    heading = math.atan2(X,Y)
-    return heading
+        return pose_change
+    
+    # Convert SE2 poses from world to robot frame
+    def to_robot_se2(self, p1_batch, p2_batch):
+        # Ensure the inputs are tensors
+        p1_batch = torch.tensor(p1_batch, dtype=torch.float32)
+        p2_batch = torch.tensor(p2_batch, dtype=torch.float32)
 
-def distance_between_two_points(self, waypoint1, waypoint2):
-    '''Calculate the distance between two gps coordinates
-        using haversine formula, returns the distance in meters'''        
-    lat1, lon1 = math.radians(waypoint1[0]), math.radians(waypoint1[1])
-    lat2, lon2 = math.radians(waypoint2[0]), math.radians(waypoint2[1])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-    c = 2 * math.asin(math.sqrt(a))
-    return self.radius_at_equator * c * 1000 #in meters
+        # Validate inputs
+        if p1_batch.shape != p2_batch.shape or p1_batch.shape[-1] != 3:
+            raise ValueError("Both batches must be of the same shape and contain 3 elements per pose")
+
+        # Extract components
+        x1, y1, theta1 = p1_batch[:, 0], p1_batch[:, 1], p1_batch[:, 2]
+        x2, y2, theta2 = p2_batch[:, 0], p2_batch[:, 1], p2_batch[:, 2]
+
+        # Construct SE2 matrices
+        zeros = torch.zeros_like(x1)
+        ones = torch.ones_like(x1)
+        T1 = torch.stack([torch.stack([torch.cos(theta1), -torch.sin(theta1), x1]),
+                            torch.stack([torch.sin(theta1),  torch.cos(theta1), y1]),
+                            torch.stack([zeros, zeros, ones])], dim=-1).permute(1,2,0)
+
+        T2 = torch.stack([torch.stack([torch.cos(theta2), -torch.sin(theta2), x2]),
+                            torch.stack([torch.sin(theta2),  torch.cos(theta2), y2]),
+                            torch.stack([zeros, zeros, ones])], dim=-1).permute(1,2,0)
+
+        # Inverse of T1 and transformation
+        T1_inv = torch.inverse(T1)
+        tf2_mat = torch.matmul(T2, T1_inv)
+
+        # Extract transformed positions and angles
+        transform = torch.matmul(T1_inv, torch.cat((p2_batch[:,:2], ones.unsqueeze(-1)), dim=1).unsqueeze(2)).squeeze()
+        transform[:, 2] = torch.atan2(tf2_mat[:, 1, 0], tf2_mat[:, 0, 0])
+        
+        return transform.numpy()
+
+    # Convert SE2 poses from robot to world frame
+    def to_world_se2(self, p1_batch, p2_batch):
+        # # Ensure the inputs are tensors
+        p1_batch = torch.tensor(p1_batch, dtype=torch.float32)
+        p2_batch = torch.tensor(p2_batch, dtype=torch.float32)
+
+        # Validate inputs
+        if p1_batch.shape != p2_batch.shape or p1_batch.shape[-1] != 3:
+            raise ValueError("Both batches must be of the same shape and contain 3 elements per pose")
+
+        # Extract components
+        x1, y1, theta1 = p1_batch[:, 0], p1_batch[:, 1], p1_batch[:, 2]
+        x2, y2, theta2 = p2_batch[:, 0], p2_batch[:, 1], p2_batch[:, 2]
+
+        # Construct SE2 matrices
+        zeros = torch.zeros_like(x1)
+        ones = torch.ones_like(x1)
+        T1 = torch.stack([torch.stack([torch.cos(theta1), -torch.sin(theta1), x1]),
+                            torch.stack([torch.sin(theta1),  torch.cos(theta1), y1]),
+                            torch.stack([zeros, zeros, ones])], dim=-1).permute(1,2,0)
+
+        T2 = torch.stack([torch.stack([torch.cos(theta2), -torch.sin(theta2), x2]),
+                            torch.stack([torch.sin(theta2),  torch.cos(theta2), y2]),
+                            torch.stack([zeros, zeros, ones])], dim=-1).permute(1,2,0)
+
+        # Inverse of T1 and transformation
+        T_tf = torch.matmul(T2, T1)
+
+        # Extract transformed positions and angles
+        transform = torch.matmul(T1, torch.cat((p2_batch[:,:2], ones.unsqueeze(-1)), dim=1).unsqueeze(2)).squeeze()
+        transform[:, 2] = torch.atan2(T_tf[:, 1, 0], T_tf[:, 0, 0])
+        
+        return transform.numpy()
