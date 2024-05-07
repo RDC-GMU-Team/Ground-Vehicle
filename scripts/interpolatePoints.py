@@ -42,6 +42,6 @@ def write_csv_file(filename, waypoints):
             csv_writer.writerow([x, y])
 
 if __name__ == "__main__":
-    waypoints = read_csv_file("waypoints.csv")
+    waypoints = read_csv_file("raw_waypoints.csv")
     new_waypoints = insert_points(waypoints)
-    write_csv_file("raw_waypoints.csv", new_waypoints)
+    write_csv_file("waypoints.csv", new_waypoints)

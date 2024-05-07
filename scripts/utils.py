@@ -5,6 +5,7 @@ import csv
 #from grid_map_msgs.msg import GridMap
 
 import numpy as np
+#import pandas as pd
 import math
 import torch
 import pyproj
@@ -29,6 +30,10 @@ class utilities:
     
     # read goal points from csv file
     def csv_to_goals(self, filename):
+        """
+        df = pd.read_csv(filename)
+        return df.values.tolist()
+        """
         # Load the CSV file
         waypoints = []
         with open(filename, mode='r') as file:
@@ -37,10 +42,11 @@ class utilities:
                 x, y = map(float, row)
                 waypoints.append((x, y))
         return waypoints
+        
     
     # convert lat lon to x y
     def gps_to_xy(self, latitude, longitude):
-        projection = pyproj.Proj("+proj=utm +zone=18 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
+        projection = pyproj.Proj("+proj=utm +zone=17 +ellps=WGS84 +datum=WGS84 +units=m +no_defs")
         
         #x, y = pyproj.transform(projection, projection.inv, longitude, latitude)
         x, y = projection(longitude, latitude)

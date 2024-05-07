@@ -56,6 +56,9 @@ class PathPlanner:
         self.target_speed = .17
         self.ground_speed = 0
 
+        #turning loop vars
+        self.turning_lock = False 
+
         self.twist = Twist()
 
         rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback, queue_size=1)
@@ -285,6 +288,9 @@ class PathPlanner:
         self.twist.angular.z = -st_ang
 
         self.cmd_pub.publish(self.twist)
+
+    def turn_loop(self):
+
 
 if __name__ == '__main__':
     rospy.init_node("Nav_Planner", anonymous=True) # Initialize the node
