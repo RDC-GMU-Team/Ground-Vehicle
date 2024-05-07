@@ -154,14 +154,16 @@ void loop() {
     //Serial.print("sensor = ");
     //Serial.println(sensorValue);
     if((sensorValue >= 100)) {
-        //digitalWrite(ADDITIONAL_OUT_1, HIGH);
-        //digitalWrite(ADDITIONAL_OUT_2, HIGH);
-        //digitalWrite(ADDITIONAL_OUT_3, HIGH);
-        //digitalWrite(ADDITIONAL_OUT_4, HIGH);
+        
+        digitalWrite(ADDITIONAL_OUT_1, HIGH);
+        digitalWrite(ADDITIONAL_OUT_2, HIGH);
+        digitalWrite(ADDITIONAL_OUT_3, HIGH);
+        digitalWrite(ADDITIONAL_OUT_4, HIGH);
         waterHit.data = 1; 
         water_log.publish(&waterHit);    
-        //emergency_stop = 1;
+        emergency_stop = 1;
         water_strike = millis();
+        
     } else {
       waterHit.data = 0;
       water_log.publish(&waterHit);
