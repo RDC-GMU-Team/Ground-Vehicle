@@ -297,6 +297,7 @@ if __name__ == "__main__":
     except rospy.ROSInterruptException:
         pass
 """
+#old code to directly pipe values to the arduino
 #!/usr/bin/env python3
 
 import rospy
