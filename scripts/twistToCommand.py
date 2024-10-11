@@ -150,6 +150,7 @@ class twistControl(object):
     #     except (Exception, b):
     #         print(b)
 
+    #callback for joystick input
     def joyControlCB(self, joy):
         try:
             #Arming Disarming
